@@ -1,1 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
 
+<title>Face Login</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#6a11cb,#2575fc);
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+margin:0;
+color:white;
+}
+
+.card{
+background:rgba(255,255,255,0.1);
+padding:30px;
+border-radius:20px;
+text-align:center;
+width:350px;
+}
+
+button{
+padding:12px 25px;
+font-size:16px;
+cursor:pointer;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>Face Login</h2>
+
+<button onclick="init()">Start Camera</button>
+
+<div id="webcam-container"></div>
+
+<div id="label-container"></div>
+
+<h3 id="status">Waiting...</h3>
+
+</div>
+
+<script>
+
+const URL = "https://teachablemachine.withgoogle.com/models/O8qWkjkK0/";
+
+let model, webcam, labelContainer, maxPredictions;
+let loggedIn = false;
+
+async function init(){
+
+const modelURL = URL + "model.json";
+const metadataURL = URL + "metadata.json";
+
+model = await tmImage.load(modelURL, metadataURL);
+maxPredictions = model.getTotalClasses();
+
+webcam = new tmImage.Webcam(320,320,true);
+
+await webcam.setup();
+await webcam.play();
+
+window.requestAnimationFrame(loop);
+
+document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+labelContainer = document.getElementById("label-container");
+
+for(let i=0;i<maxPredictions;i++){
+labelContainer.appendChild(document.createElement("div"));
+}
+
+document.getElementById("status").innerText="Scanning face...";
+
+}
+
+async function loop(){
+
+webcam.update();
+await predict();
+
+window.requestAnimationFrame(loop);
+
+}
+
+async function predict(){
+
+const prediction = await model.predict(webcam.canvas);
+
+let detectedUser=null;
+
+for(let i=0;i<maxPredictions;i++){
+
+const className = prediction[i].className;
+const probability = prediction[i].probability;
+
+labelContainer.childNodes[i].innerHTML =
+className + ": " + (probability*100).toFixed(1) + "%";
+
+if(className==="Max" && probability>0.85){
+detectedUser="Max";
+}
+
+}
+
+if(detectedUser && !loggedIn){
+
+loggedIn=true;
+
+document.getElementById("status").innerText="Welcome Max! Unlocking...";
+
+setTimeout(()=>{
+
+window.location.href="dashboard.html";
+
+},2000);
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
