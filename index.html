@@ -33,8 +33,13 @@ button{
     margin-bottom:15px;
 }
 
-#webcam-container canvas{
-    border-radius: 10px;
+#status{
+    margin-top:10px;
+    font-weight:bold;
+}
+
+canvas{
+    border-radius:10px;
     margin-top:10px;
 }
 </style>
@@ -50,7 +55,6 @@ button{
     <div id="status">Waiting...</div>
 
     <div id="webcam-container"></div>
-
     <div id="label-container"></div>
 </div>
 
@@ -68,22 +72,20 @@ async function init() {
         const modelURL = URL + "model.json";
         const metadataURL = URL + "metadata.json";
 
-        // Load model
         model = await tmImage.load(modelURL, metadataURL);
         maxPredictions = model.getTotalClasses();
 
         document.getElementById("status").innerText = "Starting camera...";
 
-        // Setup webcam
         webcam = new tmImage.Webcam(320, 320, true);
-        await webcam.setup();
-        await webcam.play();
 
-        document.getElementById("status").innerText = "Scanning face...";
+        await webcam.setup(); // triggers permission popup
+        await webcam.play();
 
         document.getElementById("webcam-container").appendChild(webcam.canvas);
 
-        // Create label slots
+        document.getElementById("status").innerText = "Scanning face...";
+
         labelContainer = document.getElementById("label-container");
         labelContainer.innerHTML = "";
 
@@ -96,7 +98,7 @@ async function init() {
     } catch (err) {
         console.error(err);
         document.getElementById("status").innerText =
-            "Error: Check camera permission or model link";
+            "Error: Camera blocked or model failed to load";
     }
 }
 
@@ -109,40 +111,32 @@ async function loop() {
 async function predict() {
     if (!model || !webcam) return;
 
-    try {
-        const prediction = await model.predict(webcam.canvas);
+    const prediction = await model.predict(webcam.canvas);
 
-        let detected = false;
+    let detected = false;
 
-        for (let i = 0; i < maxPredictions; i++) {
+    for (let i = 0; i < maxPredictions; i++) {
 
-            const className = prediction[i].className;
-            const probability = prediction[i].probability;
+        const className = prediction[i].className;
+        const probability = prediction[i].probability;
 
-            labelContainer.childNodes[i].innerHTML =
-                `${className}: ${(probability * 100).toFixed(1)}%`;
+        labelContainer.childNodes[i].innerHTML =
+            `${className}: ${(probability * 100).toFixed(1)}%`;
 
-            console.log(className, probability);
-
-            // IMPORTANT: match class name safely
-            if (className.trim().toLowerCase() === "max" && probability > 0.85) {
-                detected = true;
-            }
+        if (className.trim().toLowerCase() === "max" && probability > 0.85) {
+            detected = true;
         }
+    }
 
-        if (detected && !loggedIn) {
-            loggedIn = true;
+    if (detected && !loggedIn) {
+        loggedIn = true;
 
-            document.getElementById("status").innerText =
-                "Welcome Max! Redirecting...";
+        document.getElementById("status").innerText =
+            "Welcome Max! Redirecting...";
 
-            setTimeout(() => {
-                window.location.href = "dashboard.html";
-            }, 1500);
-        }
-
-    } catch (err) {
-        console.error("Prediction error:", err);
+        setTimeout(() => {
+            window.location.href = "dashboard.html";
+        }, 1500);
     }
 }
 
