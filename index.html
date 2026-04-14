@@ -1,57 +1,57 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <title>Face Login</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
 
 <style>
-
 body{
-font-family:Arial;
-background:linear-gradient(135deg,#6a11cb,#2575fc);
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
-margin:0;
-color:white;
+    font-family: Arial;
+    background: linear-gradient(135deg,#6a11cb,#2575fc);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    margin:0;
+    color:white;
 }
 
 .card{
-background:rgba(255,255,255,0.1);
-padding:30px;
-border-radius:20px;
-text-align:center;
-width:350px;
+    background: rgba(255,255,255,0.1);
+    padding:30px;
+    border-radius:20px;
+    text-align:center;
+    width:350px;
 }
 
 button{
-padding:12px 25px;
-font-size:16px;
-cursor:pointer;
+    padding:12px 25px;
+    font-size:16px;
+    cursor:pointer;
+    margin-bottom:15px;
 }
 
+#webcam-container canvas{
+    border-radius: 10px;
+    margin-top:10px;
+}
 </style>
-
 </head>
 
 <body>
 
 <div class="card">
+    <h2>Face Login</h2>
 
-<h2>Face Login</h2>
+    <button onclick="init()">Start Camera</button>
 
-<button onclick="init()">Start Camera</button>
+    <div id="status">Waiting...</div>
 
-<div id="webcam-container"></div>
+    <div id="webcam-container"></div>
 
-<div id="label-container"></div>
-
-<h3 id="status">Waiting...</h3>
-
+    <div id="label-container"></div>
 </div>
 
 <script>
@@ -61,76 +61,89 @@ const URL = "https://teachablemachine.withgoogle.com/models/O8qWkjkK0/";
 let model, webcam, labelContainer, maxPredictions;
 let loggedIn = false;
 
-async function init(){
+async function init() {
+    try {
+        document.getElementById("status").innerText = "Loading model...";
 
-const modelURL = URL + "model.json";
-const metadataURL = URL + "metadata.json";
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
 
-model = await tmImage.load(modelURL, metadataURL);
-maxPredictions = model.getTotalClasses();
+        // Load model
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
 
-webcam = new tmImage.Webcam(320,320,true);
+        document.getElementById("status").innerText = "Starting camera...";
 
-await webcam.setup();
-await webcam.play();
+        // Setup webcam
+        webcam = new tmImage.Webcam(320, 320, true);
+        await webcam.setup();
+        await webcam.play();
 
-window.requestAnimationFrame(loop);
+        document.getElementById("status").innerText = "Scanning face...";
 
-document.getElementById("webcam-container").appendChild(webcam.canvas);
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
 
-labelContainer = document.getElementById("label-container");
+        // Create label slots
+        labelContainer = document.getElementById("label-container");
+        labelContainer.innerHTML = "";
 
-for(let i=0;i<maxPredictions;i++){
-labelContainer.appendChild(document.createElement("div"));
+        for (let i = 0; i < maxPredictions; i++) {
+            labelContainer.appendChild(document.createElement("div"));
+        }
+
+        loop();
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText =
+            "Error: Check camera permission or model link";
+    }
 }
 
-document.getElementById("status").innerText="Scanning face...";
-
+async function loop() {
+    webcam.update();
+    await predict();
+    window.requestAnimationFrame(loop);
 }
 
-async function loop(){
+async function predict() {
+    if (!model || !webcam) return;
 
-webcam.update();
-await predict();
+    try {
+        const prediction = await model.predict(webcam.canvas);
 
-window.requestAnimationFrame(loop);
+        let detected = false;
 
-}
+        for (let i = 0; i < maxPredictions; i++) {
 
-async function predict(){
+            const className = prediction[i].className;
+            const probability = prediction[i].probability;
 
-const prediction = await model.predict(webcam.canvas);
+            labelContainer.childNodes[i].innerHTML =
+                `${className}: ${(probability * 100).toFixed(1)}%`;
 
-let detectedUser=null;
+            console.log(className, probability);
 
-for(let i=0;i<maxPredictions;i++){
+            // IMPORTANT: match class name safely
+            if (className.trim().toLowerCase() === "max" && probability > 0.85) {
+                detected = true;
+            }
+        }
 
-const className = prediction[i].className;
-const probability = prediction[i].probability;
+        if (detected && !loggedIn) {
+            loggedIn = true;
 
-labelContainer.childNodes[i].innerHTML =
-className + ": " + (probability*100).toFixed(1) + "%";
+            document.getElementById("status").innerText =
+                "Welcome Max! Redirecting...";
 
-if(className==="Max" && probability>0.85){
-detectedUser="Max";
-}
+            setTimeout(() => {
+                window.location.href = "dashboard.html";
+            }, 1500);
+        }
 
-}
-
-if(detectedUser && !loggedIn){
-
-loggedIn=true;
-
-document.getElementById("status").innerText="Welcome Max! Unlocking...";
-
-setTimeout(()=>{
-
-window.location.href="dashboard.html";
-
-},2000);
-
-}
-
+    } catch (err) {
+        console.error("Prediction error:", err);
+    }
 }
 
 </script>
